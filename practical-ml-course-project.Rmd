@@ -1,0 +1,163 @@
+---
+title: "Practical Machine Learning Course Project"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The goal of this project is to predict the manner in which they did the exercise. 
+
+## Data Pre-processing
+
+```{r}
+#loading libraries
+library(ggplot2)
+library(caret)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+library(corrplot)
+library(lattice)
+library(kernlab)
+```
+
+
+## Data exploration
+
+```{r}
+# reading in data
+training_csv <- read.csv("pml-training.csv")
+testing_csv <- read.csv("pml-testing.csv")
+head(training_csv)
+```
+```{r}
+# viewing dimensions of datasets
+dim(training_csv)
+dim(testing_csv)
+```
+
+```{r}
+# removing missing values
+training_csv <- training_csv[,colMeans(is.na(training_csv)) == 0]
+# removing irrelevant variables 
+training_csv <- training_csv[,-c(1:7)]
+dim(training_csv)
+```
+
+Having cleaned the data, we must now split the training dataset into a sub-training dataset and a testing dataset. 
+
+```{r}
+set.seed(1000)
+subTrain <- createDataPartition(training_csv$classe, p=0.7, list=F)
+train_data <- training_csv[subTrain, ]
+test_data <- training_csv[-subTrain, ]
+
+# removing near-zero variance variables
+nzv <- nearZeroVar(train_data)
+train_data <- train_data[,-nzv]
+test_data <- test_data[,-nzv]
+
+dim(train_data)
+dim(test_data)
+```
+
+## Building and testing the models
+
+The three models we will use are random forests, generalised boosted regression model, and decision tree classification. First, we establish a control:
+
+```{r}
+control_data <- trainControl(method="cv", number=3, verboseIter=F)
+```
+
+
+### Random Forests
+
+```{r}
+rf_model <- train(classe~., data=train_data, method="rf", trControl=control_data)
+predict_rf <- predict(rf_model, test_data)
+conmatrf <- confusionMatrix(predict_rf, factor(test_data$classe))
+
+conmatrf
+```
+```{r}
+round(conmatrf$overall['Accuracy'],5)
+```
+
+The accuracy rate of the random forest is very high (0.99371), and the out of sample error rate is thus around 0.01.
+
+Plotting the model:
+
+```{r}
+plot(rf_model)
+```
+
+### Generalised Boosted regression model
+
+```{r}
+gbm_model <- train(classe~., data=train_data, method="gbm", trControl=control_data)
+predict_gbm <- predict(gbm_model, test_data)
+conmatgbm <- confusionMatrix(predict_gbm, factor(test_data$classe))
+conmatgbm
+```
+
+```{r}
+round(conmatgbm$overall['Accuracy'],5)
+```
+
+
+Accuracy is very high (0.96313), but not as accurate as the random forest model, and the out of sample error rate is 0.03687.
+
+Plotting the model:
+
+```{r}
+plot(gbm_model)
+```
+
+
+### Decision Tree classification
+
+```{r}
+dectree_model <- train(classe~., data=train_data, method="rpart", trControl=control_data)
+fancyRpartPlot(dectree_model$finalModel)
+```
+
+```{r}
+predict_dectree <- predict(dectree_model, test_data)
+conmatdectree <- confusionMatrix(predict_dectree, factor(test_data$classe))
+conmatdectree
+```
+```{r}
+round(conmatdectree$overall['Accuracy'], 5)
+```
+
+This model has a very low accuracy of less than 0.5 (0.49295), certainly far less accurate than the previous two models we have trained. The out of sample error rate is around 0.5. 
+
+```{r}
+plot(dectree_model)
+```
+
+## Application of best model
+
+From the above, we can see that the best model is the random forest model, with 0.99371 accuracy and around 0.01 out of sample error rate. Therefore, this is the model we will use.
+
+```{r}
+predict <- predict(rf_model, testing_csv)
+print(predict)
+```
+
+
+
+
+
+
+
+
+
